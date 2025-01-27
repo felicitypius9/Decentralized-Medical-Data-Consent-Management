@@ -1,21 +1,63 @@
-
 import { describe, expect, it } from "vitest";
+import { Cl } from "@stacks/transactions";
 
 const accounts = simnet.getAccounts();
-const address1 = accounts.get("wallet_1")!;
+const patient = accounts.get("wallet_1")!;
+const provider = accounts.get("wallet_2")!;
 
-/*
-  The test below is an example. To learn more, read the testing documentation here:
-  https://docs.hiro.so/stacks/clarinet-js-sdk
-*/
+describe("dmdcm contract", () => {
+  it("allows patients to grant consent", () => {
+    const grantCall = simnet.callPublicFn(
+      "dmdcm",
+      "grant-consent",
+      [Cl.principal(provider)],
+      patient
+    );
+    expect(grantCall.result).toBeOk(Cl.bool(true));
 
-describe("example tests", () => {
-  it("ensures simnet is well initalised", () => {
-    expect(simnet.blockHeight).toBeDefined();
+    const checkCall = simnet.callReadOnlyFn(
+      "dmdcm",
+      "check-consent",
+      [Cl.principal(patient), Cl.principal(provider)],
+      patient
+    );
+    expect(checkCall.result).toStrictEqual(
+      Cl.tuple({
+        authorized: Cl.bool(true),
+        timestamp: Cl.uint(simnet.blockHeight),
+      })
+    );
   });
 
-  // it("shows an example", () => {
-  //   const { result } = simnet.callReadOnlyFn("counter", "get-counter", [], address1);
-  //   expect(result).toBeUint(0);
-  // });
+  it("allows patients to revoke consent", () => {
+    // First grant consent
+    simnet.callPublicFn(
+      "dmdcm",
+      "grant-consent",
+      [Cl.principal(provider)],
+      patient
+    );
+
+    // Then revoke it
+    const revokeCall = simnet.callPublicFn(
+      "dmdcm",
+      "revoke-consent",
+      [Cl.principal(provider)],
+      patient
+    );
+    expect(revokeCall.result).toBeOk(Cl.bool(true));
+
+    const checkCall = simnet.callReadOnlyFn(
+      "dmdcm",
+      "check-consent",
+      [Cl.principal(patient), Cl.principal(provider)],
+      patient
+    );
+    expect(checkCall.result).toStrictEqual(
+      Cl.tuple({
+        authorized: Cl.bool(false),
+        timestamp: Cl.uint(simnet.blockHeight),
+      })
+    );
+  });
 });
