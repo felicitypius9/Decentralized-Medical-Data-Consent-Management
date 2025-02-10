@@ -180,3 +180,21 @@
         (match consent
             c (< stacks-block-height (get expiry c))
             false)))
+
+
+
+(define-map category-permissions
+    { patient: principal, provider: principal, category: (string-ascii 20) }
+    { authorized: bool })
+
+(define-public (set-category-permission (provider principal) (category (string-ascii 20)) (authorized bool))
+    (begin
+        (map-set category-permissions
+            { patient: tx-sender, provider: provider, category: category }
+            { authorized: authorized })
+        (ok true)))
+
+(define-read-only (check-category-permission (patient principal) (provider principal) (category (string-ascii 20)))
+    (default-to 
+        { authorized: false }
+        (map-get? category-permissions { patient: patient, provider: provider, category: category })))
