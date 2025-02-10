@@ -126,3 +126,57 @@
 (define-read-only (get-log-count)
     (var-get log-count)
 )
+
+
+
+;; Emergency contacts map
+(define-map emergency-contacts
+    principal  ;; patient
+    (list 3 principal)) ;; up to 3 emergency contacts
+
+;; Emergency override status
+(define-map emergency-override
+    { patient: principal, provider: principal }
+    { active: bool, activated-by: principal, timestamp: uint })
+
+(define-public (add-emergency-contact (contact principal))
+    (let ((current-contacts (default-to (list) (map-get? emergency-contacts tx-sender))))
+        (if (< (len current-contacts) u3)
+            (begin
+                (map-set emergency-contacts 
+                    tx-sender 
+                    (unwrap-panic (as-max-len? (concat current-contacts (list contact)) u3)))
+                (ok true))
+            (err u403))))
+            
+(define-read-only (is-contact (contact principal) (patient principal))
+    (let ((contacts (default-to (list) (map-get? emergency-contacts patient))))
+        (is-some (index-of contacts contact))))
+
+(define-public (activate-emergency-access (patient principal))
+    (let ((is-emergency-contact (is-contact tx-sender patient)))
+        (if is-emergency-contact
+            (begin
+                (map-set emergency-override 
+                    { patient: patient, provider: tx-sender }
+                    { active: true, activated-by: tx-sender, timestamp: stacks-block-height })
+                (ok true))
+            (err u403))))
+
+
+(define-map timed-consents
+    { patient: principal, provider: principal }
+    { expiry: uint, authorized: bool })
+
+(define-public (grant-timed-consent (provider principal) (duration uint))
+    (let ((expiry (+ stacks-block-height duration)))
+        (map-set timed-consents
+            { patient: tx-sender, provider: provider }
+            { expiry: expiry, authorized: true })
+        (ok true)))
+
+(define-read-only (check-timed-consent (patient principal) (provider principal))
+    (let ((consent (map-get? timed-consents { patient: patient, provider: provider })))
+        (match consent
+            c (< stacks-block-height (get expiry c))
+            false)))
