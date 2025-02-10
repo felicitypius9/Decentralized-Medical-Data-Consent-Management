@@ -246,3 +246,27 @@
     (let ((group-providers (default-to (list) (map-get? consent-groups { group-id: group-id }))))
         (map grant-consent group-providers)
         (ok true)))
+
+
+(define-map access-requests
+    { patient: principal, provider: principal }
+    { status: (string-ascii 10), timestamp: uint, purpose: (string-ascii 256) })
+
+(define-public (request-access (patient principal) (purpose (string-ascii 256)))
+    (begin
+        (map-set access-requests
+            { patient: patient, provider: tx-sender }
+            { status: "pending", timestamp: stacks-block-height, purpose: purpose })
+        (ok true)))
+
+(define-public (respond-to-request (provider principal) (approved bool))
+    (begin
+        (map-set access-requests
+            { patient: tx-sender, provider: provider }
+            { status: (if approved "approved" "denied"),
+              timestamp: stacks-block-height,
+              purpose: (get purpose (default-to { purpose: "" } 
+                      (map-get? access-requests { patient: tx-sender, provider: provider }))) })
+        (if approved
+            (grant-consent provider)
+            (ok true))))
