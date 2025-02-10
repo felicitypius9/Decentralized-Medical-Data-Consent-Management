@@ -198,3 +198,18 @@
     (default-to 
         { authorized: false }
         (map-get? category-permissions { patient: patient, provider: provider, category: category })))
+
+
+
+(define-map sharing-history
+    principal  ;; patient
+    (list 51 { provider: principal, timestamp: uint, action: (string-ascii 20) }))
+
+(define-public (record-sharing (patient principal) (action (string-ascii 20)))
+    (let ((current-history (default-to (list) (map-get? sharing-history patient))))
+        (map-set sharing-history 
+            patient
+            (unwrap-panic (as-max-len? (append current-history { provider: tx-sender, 
+                                    timestamp: stacks-block-height, 
+                                    action: action }) u51)))
+        (ok true)))
