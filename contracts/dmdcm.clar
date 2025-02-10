@@ -213,3 +213,36 @@
                                     timestamp: stacks-block-height, 
                                     action: action }) u51)))
         (ok true)))
+
+
+
+(define-map provider-ratings
+    principal  ;; provider
+    { total-score: uint, count: uint })
+
+(define-public (rate-provider (provider principal) (score uint))
+    (let ((current-rating (default-to { total-score: u0, count: u0 } 
+                          (map-get? provider-ratings provider))))
+        (map-set provider-ratings 
+            provider
+            { total-score: (+ (get total-score current-rating) score),
+              count: (+ (get count current-rating) u1) })
+        (ok true)))
+
+
+
+(define-map consent-groups
+    { group-id: (string-ascii 32) }
+    (list 50 principal))  ;; list of providers
+
+(define-public (create-consent-group (group-id (string-ascii 32)) (provider-list (list 50 principal)))
+    (begin
+        (map-set consent-groups
+            { group-id: group-id }
+            provider-list)
+        (ok true)))
+
+(define-public (grant-group-consent (group-id (string-ascii 32)))
+    (let ((group-providers (default-to (list) (map-get? consent-groups { group-id: group-id }))))
+        (map grant-consent group-providers)
+        (ok true)))
