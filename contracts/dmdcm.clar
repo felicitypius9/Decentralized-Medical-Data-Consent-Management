@@ -270,3 +270,117 @@
         (if approved
             (grant-consent provider)
             (ok true))))
+
+
+;; Data export tracking
+(define-map data-exports 
+    { patient: principal, timestamp: uint }
+    { format: (string-ascii 10), data-hash: (string-ascii 64) })
+
+(define-public (record-data-export (format (string-ascii 10)) (data-hash (string-ascii 64)))
+    (begin
+        (map-set data-exports
+            { patient: tx-sender, timestamp: stacks-block-height }
+            { format: format, data-hash: data-hash })
+        (ok true)))
+
+
+(define-map delegated-consents
+    { patient: principal, delegate: principal }
+    { active: bool, expiry: uint })
+
+(define-public (delegate-consent-management (delegate principal) (duration uint))
+    (begin
+        (map-set delegated-consents
+            { patient: tx-sender, delegate: delegate }
+            { active: true, expiry: (+ stacks-block-height duration) })
+        (ok true)))
+
+(define-read-only (check-delegation (patient principal) (delegate principal))
+    (let ((delegation (default-to { active: false, expiry: u0 } 
+                      (map-get? delegated-consents { patient: patient, delegate: delegate }))))
+        (and (get active delegation)
+             (> (get expiry delegation) stacks-block-height))))
+
+
+
+(define-map provider-specializations
+    principal
+    (list 5 (string-ascii 32)))
+
+(define-public (add-specialization (specialization (string-ascii 32)))
+    (let ((current-specs (default-to (list) (map-get? provider-specializations tx-sender))))
+        (map-set provider-specializations
+            tx-sender
+            (unwrap-panic (as-max-len? (append current-specs specialization) u5)))
+        (ok true)))
+
+
+(define-map patient-data-categories
+    principal
+    (list 10 { category: (string-ascii 32), last-updated: uint }))
+
+(define-public (add-data-category (category (string-ascii 32)))
+    (let ((current-categories (default-to (list) (map-get? patient-data-categories tx-sender))))
+        (map-set patient-data-categories
+            tx-sender
+            (unwrap-panic (as-max-len? 
+                (append current-categories { category: category, last-updated: stacks-block-height }) 
+                u10)))
+        (ok true)))
+
+
+
+(define-map access-time-restrictions
+    { patient: principal, provider: principal }
+    { start-time: uint, end-time: uint })
+
+(define-public (set-access-time (provider principal) (start-time uint) (end-time uint))
+    (begin
+        (map-set access-time-restrictions
+            { patient: tx-sender, provider: provider }
+            { start-time: start-time, end-time: end-time })
+        (ok true)))
+
+
+(define-map consent-templates
+    (string-ascii 32)
+    { description: (string-ascii 256), duration: uint, categories: (list 5 (string-ascii 32)) })
+
+(define-public (create-consent-template 
+    (template-id (string-ascii 32))
+    (description (string-ascii 256))
+    (duration uint)
+    (categories (list 5 (string-ascii 32))))
+    (begin
+        (map-set consent-templates
+            template-id
+            { description: description, duration: duration, categories: categories })
+        (ok true)))
+
+
+(define-map patient-notes
+    { patient: principal, timestamp: uint }
+    { note: (string-ascii 256), provider: principal })
+
+(define-public (add-patient-note (patient principal) (note (string-ascii 256)))
+    (begin
+        (map-set patient-notes
+            { patient: patient, timestamp: stacks-block-height }
+            { note: note, provider: tx-sender })
+        (ok true)))
+
+
+(define-map access-levels
+    { patient: principal, provider: principal }
+    { level: uint, description: (string-ascii 64) })
+
+(define-public (set-access-level 
+    (provider principal) 
+    (level uint) 
+    (description (string-ascii 64)))
+    (begin
+        (map-set access-levels
+            { patient: tx-sender, provider: provider }
+            { level: level, description: description })
+        (ok true)))
