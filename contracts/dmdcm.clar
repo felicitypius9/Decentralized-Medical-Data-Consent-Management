@@ -384,3 +384,60 @@
             { patient: tx-sender, provider: provider }
             { level: level, description: description })
         (ok true)))
+
+
+
+(define-map batch-consent-operations
+    { batch-id: (string-ascii 32) }
+    { providers: (list 50 principal), status: (string-ascii 10) })
+
+(define-public (batch-grant-consent (batch-id (string-ascii 32)) (provider-list (list 50 principal)))
+    (begin
+        (map-set batch-consent-operations
+            { batch-id: batch-id }
+            { providers: provider-list, status: "granted" })
+        (map grant-consent provider-list)
+        (ok true)))
+
+(define-public (batch-revoke-consent (batch-id (string-ascii 32)) (provider-list (list 50 principal)))
+    (begin
+        (map-set batch-consent-operations
+            { batch-id: batch-id }
+            { providers: provider-list, status: "revoked" })
+        (map revoke-consent provider-list)
+        (ok true)))
+
+(define-read-only (get-batch-operation (batch-id (string-ascii 32)))
+    (map-get? batch-consent-operations { batch-id: batch-id }))
+
+
+
+
+(define-map consent-timeline
+    { patient: principal }
+    (list 100 { 
+        timestamp: uint,
+        provider: principal,
+        action: (string-ascii 20),
+        details: (string-ascii 256)
+    }))
+
+(define-public (record-consent-action 
+    (provider principal) 
+    (action (string-ascii 20)) 
+    (details (string-ascii 256)))
+    (let ((current-timeline (default-to (list) 
+            (map-get? consent-timeline { patient: tx-sender }))))
+        (map-set consent-timeline
+            { patient: tx-sender }
+            (unwrap-panic (as-max-len? 
+                (append current-timeline {
+                    timestamp: stacks-block-height,
+                    provider: provider,
+                    action: action,
+                    details: details
+                }) u100)))
+        (ok true)))
+
+(define-read-only (get-consent-timeline (patient principal))
+    (default-to (list) (map-get? consent-timeline { patient: patient })))
