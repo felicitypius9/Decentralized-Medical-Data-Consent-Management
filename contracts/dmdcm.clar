@@ -441,3 +441,101 @@
 
 (define-read-only (get-consent-timeline (patient principal))
     (default-to (list) (map-get? consent-timeline { patient: patient })))
+
+
+
+(define-map delegation-transfers
+    { patient: principal, from-delegate: principal, to-delegate: principal }
+    { status: (string-ascii 10), timestamp: uint, expiry: uint })
+
+(define-public (initiate-delegation-transfer 
+    (from-delegate principal) 
+    (to-delegate principal) 
+    (new-expiry uint))
+    (let ((current-delegation (map-get? delegated-consents 
+            { patient: tx-sender, delegate: from-delegate })))
+        (if (and
+            (is-some current-delegation)
+            (get active (unwrap-panic current-delegation)))
+            (begin
+                (map-set delegation-transfers
+                    { patient: tx-sender,
+                      from-delegate: from-delegate,
+                      to-delegate: to-delegate }
+                    { status: "pending",
+                      timestamp: stacks-block-height,
+                      expiry: new-expiry })
+                (ok true))
+            (err u403))))
+
+(define-public (accept-delegation-transfer (patient principal) (from-delegate principal))
+    (let ((transfer-data (map-get? delegation-transfers
+            { patient: patient,
+              from-delegate: from-delegate,
+              to-delegate: tx-sender })))
+        (if (and
+            (is-some transfer-data)
+            (is-eq (get status (unwrap-panic transfer-data)) "pending"))
+            (begin
+                (map-set delegated-consents
+                    { patient: patient, delegate: tx-sender }
+                    { active: true,
+                      expiry: (get expiry (unwrap-panic transfer-data)) })
+                (map-set delegated-consents
+                    { patient: patient, delegate: from-delegate }
+                    { active: false, expiry: u0 })
+                (ok true))
+            (err u403))))
+
+
+
+
+(define-map policy-templates
+    { template-id: (string-ascii 32), version: uint }
+    { content: (string-ascii 512),
+      created-by: principal,
+      created-at: uint,
+      active: bool })
+
+(define-map patient-policy-acceptance
+    { patient: principal, template-id: (string-ascii 32) }
+    { accepted-version: uint,
+      acceptance-date: uint })
+
+(define-public (create-policy-template 
+    (template-id (string-ascii 32))
+    (content (string-ascii 512)))
+    (let ((current-version (get-latest-version template-id)))
+        (map-set policy-templates
+            { template-id: template-id,
+              version: (+ current-version u1) }
+            { content: content,
+              created-by: tx-sender,
+              created-at: stacks-block-height,
+              active: true })
+        (map-set template-versions template-id (+ current-version u1))
+        (ok true)))
+(define-map template-versions
+    (string-ascii 32)
+    uint)
+
+(define-read-only (get-latest-version (template-id (string-ascii 32)))
+    (default-to u0 (map-get? template-versions template-id)))
+    ;; (fold + u0 (map-get? policy-templates { template-id: template-id }))
+    
+(define-public (accept-policy 
+    (template-id (string-ascii 32))
+    (version uint))
+    (let ((policy (map-get? policy-templates 
+            { template-id: template-id, version: version })))
+        (if (and
+            (is-some policy)
+            (get active (unwrap-panic policy)))
+            (begin
+                (map-set patient-policy-acceptance
+                    { patient: tx-sender,
+                      template-id: template-id }
+                    { accepted-version: version,
+                      acceptance-date: stacks-block-height })
+                (ok true))
+            (err u404))))
