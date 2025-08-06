@@ -50,6 +50,21 @@ plan:
     - id: 0
       transactions:
         - emulated-contract-publish:
+            contract-name: audit-trail
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "contracts\\audit-trail.clar"
+            clarity-version: 3
+        - emulated-contract-publish:
+            contract-name: biometric-auth
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "contracts\\biometric-auth.clar"
+            clarity-version: 3
+        - emulated-contract-publish:
+            contract-name: data-anonymization
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "contracts\\data-anonymization.clar"
+            clarity-version: 3
+        - emulated-contract-publish:
             contract-name: dmdcm
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: "contracts\\dmdcm.clar"
