@@ -60,6 +60,11 @@ plan:
             path: "contracts\\biometric-auth.clar"
             clarity-version: 3
         - emulated-contract-publish:
+            contract-name: breach-notification
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "contracts\\breach-notification.clar"
+            clarity-version: 3
+        - emulated-contract-publish:
             contract-name: data-anonymization
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: "contracts\\data-anonymization.clar"
